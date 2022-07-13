@@ -1,11 +1,8 @@
-#TODO: hover button for info -> asyncio image tooltips
-#TODO: future discord integration with bot (:
+#TODO: hover button for info -> asyncio image tooltips <- L
+#TODO: make it so scrollview lets me see all items nad not just like 5 <- L
+#TODO: make dabstring copyable, format it not inhumanely <- W, then L
 
-#TODO: selectall/none buttons
-#TODO: Potential copy to clipboard button (?)
-#TODO: make it so scrollview lets me see all items nad not just like 5
-#TODO: make dabstring copyable, format it not inhumanely
-
+import subprocess
 from kivy.app import App 
 from kivy.uix.label import Label
 from kivy.uix.gridlayout import GridLayout
@@ -16,7 +13,7 @@ from kivy.uix.floatlayout import FloatLayout
 from kivy.uix.screenmanager import ScreenManager, Screen, NoTransition
 from kivy.core.window import Window
 from kivy.uix.scrollview import ScrollView
-from functools import partial as partial #when you press a button, it sends None as the args to allow the .bind() to work; this is needed to send actual args
+from functools import partial as partial #when you press a button, it sends None as the args to allow the .bind() to work; this is useful to send actual args to other screens
 
 
 class MudaeApp(App):
@@ -57,9 +54,6 @@ class InputScreen(Screen):
             self.manager.current = 'Checklist'
 
 
-acceptedString = ["$divorceallbut"]
-kaCount = 0
-
 class CheckListScreen(Screen):
     """main action screen, user chooses which characters here"""
 
@@ -75,6 +69,10 @@ class CheckListScreen(Screen):
 
     def update(self, mudaeSorted):
         """recreates CheckListScreen (from rawConfirm)"""
+
+        global acceptedString, kaCount
+        acceptedString = ["$divorceallbut"]
+        kaCount = 0
 
         layout = FloatLayout(size = (1000,800))
         Window.size = (1000, 800)
@@ -105,19 +103,19 @@ class CheckListScreen(Screen):
         layout.add_widget(removeAllButton)
         removeAllButton.bind(on_press = partial(self.removeAll, "", mudaeSorted))
 
-        global acceptedString, kaCount
-        acceptedString = ["$divorceallbut"]
-        kaCount = 0
-        
+        copyButton = Button(text = "copy", size_hint = (0.25, 0.05), pos_hint = {"x":0.5, "y":0.05})
+        layout.add_widget(copyButton)
+        copyButton.bind(on_press = self.copyButtonCall)
+
         self.acceptedStringLabel = Label(
             text = "".join(acceptedString),
             size_hint = (0.25,0.03), pos_hint = {"right":1, "bottom":1}
         )
-        layout.add_widget(self.acceptedStringLabel)
+        layout.add_widget(self.acceptedStringLabel) #BUG: incredibly broken, fixable but scrollview broke me
 
         self.kaCounter = Label(
             text = "Total Kakera: "+ str(kaCount),
-            size_hint = (0.15,0.07), #pos_hint = {"right":1, "bottom":0.6}
+            size_hint = (0.15,0.07),
             pos_hint = {"x":0.85, "y":0.05}
         )
         layout.add_widget(self.kaCounter)
@@ -128,7 +126,15 @@ class CheckListScreen(Screen):
             availBox.add_widget(characterAvail) #BUG: left allign characters
             characterAvail.bind(on_press = partial(self.acceptCharacter, "", (x, mudaeSorted[x])))
 
-
+    def copyButtonCall(self, btn):
+        try:
+            copy2clip(self.acceptedStringLabel.text)
+        except ValueError as error:
+            print(error)
+            pass
+        except TypeError as error:
+            print(error)
+            pass
 
     def acceptCharacter(self, btn, *args):
         """accepts characters -> moves them to accepted list, adds to kaCounter and dabString"""
@@ -142,7 +148,7 @@ class CheckListScreen(Screen):
 
         global acceptedString, kaCount
         acceptedString.append(charName)
-        self.acceptedStringLabel.text = " ".join(acceptedString)
+        self.acceptedStringLabel.text = " $".join(acceptedString)
         kaCount += charKa
         self.kaCounter.text = "Total Kakera: "+ str(kaCount)
 
@@ -150,11 +156,11 @@ class CheckListScreen(Screen):
         """accepts all characters by deleting all current entries and rebuilding them, updates kaCount and dabstring"""
         mudaeSorted, _ = args
         try:
-            print(mudaeSorted)
             self.ids["AvailBox"].clear_widgets()
             self.ids["ChosenBox"].clear_widgets()
             global acceptedString, kaCount
             acceptedString.clear()
+            acceptedString.append("$divorceallbut")            
             kaCount = 0
 
             for char in mudaeSorted:
@@ -163,18 +169,15 @@ class CheckListScreen(Screen):
                 self.ids["ChosenBox"].add_widget(charAccepted) #BUG: left allign characters
                 charAccepted.bind(on_press = partial(self.removeCharacter, "", (char, mudaeSorted[char])))
                 
-
                 acceptedString.append(char)
                 kaCount += mudaeSorted[char]
 
-            self.acceptedStringLabel.text = " ".join(acceptedString)
+            self.acceptedStringLabel.text = " $".join(acceptedString)
             self.kaCounter.text = "Total Kakera: "+ str(kaCount)
 
-        except KeyError as error: #REVIEW: built as a test, remove in final version
+        except KeyError as error: #REVIEW: built as a test, remove in final version, pop up an error?
             print(error)
             pass
-        
-
 
     def removeCharacter(self, btn, *args):
         """accepts characters -> moves them to available list, subtracts from kaCounter and dabString"""
@@ -188,7 +191,7 @@ class CheckListScreen(Screen):
 
         global acceptedString, kaCount
         acceptedString.remove(charName)
-        self.acceptedStringLabel.text = " ".join(acceptedString)
+        self.acceptedStringLabel.text = " $".join(acceptedString)
         kaCount -= charKa
         self.kaCounter.text = "Total Kakera: "+ str(kaCount)
     
@@ -196,11 +199,11 @@ class CheckListScreen(Screen):
         """removes all characters by deleting all current entries and rebuilding them, updates kaCount and dabstring"""
         mudaeSorted, _ = args
         try:
-            print(mudaeSorted)
             self.ids["AvailBox"].clear_widgets()
             self.ids["ChosenBox"].clear_widgets()
             global acceptedString, kaCount
             acceptedString.clear()
+            acceptedString.append("$divorceallbut")
             kaCount = 0
 
             for char in mudaeSorted:
@@ -209,10 +212,10 @@ class CheckListScreen(Screen):
                 self.ids["AvailBox"].add_widget(characterAvail) #BUG: left allign characters
                 characterAvail.bind(on_press = partial(self.acceptCharacter, "", (char, mudaeSorted[char])))
 
-            self.acceptedStringLabel.text = " ".join(acceptedString)
+            self.acceptedStringLabel.text = " $".join(acceptedString)
             self.kaCounter.text = "Total Kakera: "+ str(kaCount)
 
-        except KeyError as error: #REVIEW: built as a test, remove in final version
+        except KeyError as error: #REVIEW: built as a test, remove in final version, pop up an error?
             print(error)
             pass
 
@@ -242,12 +245,12 @@ def sortList(mudaeRaw: str) -> dict[str, int]:
         mudaeList = [item.split() for item in mudaeRaw]
         mudaeSorted = {" ".join(_[:-2]):int("".join(_[-2:-1])) for _ in mudaeList}
         return mudaeSorted
-    except ValueError:
+    except ValueError as error:
         return "you suck, try again"
 
-
-
-
+def copy2clip(txt):
+    cmd='echo '+txt.strip()+'|clip'
+    return subprocess.check_call(cmd, shell=True)
 
 if __name__ == '__main__':
     MudaeApp().run()
